@@ -1,0 +1,146 @@
+import pandas as pd
+import streamlit as st
+from PIL import Image
+import altair as alt
+import plotly.express as px
+data=pd.read_csv('Employee_data.csv')
+print(data.columns)
+print(data.head())
+data=data.drop(columns=['id_employee','position_id','employment_status','department','manager_name','manager_id','recruitment_source','performance_score_desc'])
+print(data.columns)
+print(data.dtypes)
+data['birth_date']=pd.to_datetime(data['birth_date'],
+                                   format='%d/%m/%y')
+data['hiring_date']=pd.to_datetime(data['hiring_date'],
+                                   format='%d/%m/%y')
+data['last_performance_date']=pd.to_datetime(data['last_performance_date'],
+                                   format='%d/%m/%y')
+data['gender']=data['gender'].str.strip()
+
+print('-')
+print(data.dtypes)
+#titulo
+st.title('**_Socialize your knowledge_**')
+#descripcion
+st.header('Dashboard de desempeño')
+#Logotipo "Manchester United"
+image=Image.open('MUFC.jpg')
+rezise_img=image.resize((320,240))
+st.image(rezise_img)
+#seleccionar genero
+add_select_gender=st.sidebar.selectbox(
+    'Seleccione genero del empleado: ',
+    options=['Todos']+list(data['gender'].unique())
+
+)
+data_fil=data.copy()
+if add_select_gender !='Todos':
+    data_fil=data_fil[data_fil['gender']==add_select_gender]
+
+#rango de puntaje obtenido
+max_score=data.performance_score.max().astype(float)
+min_score=data.performance_score.min().astype(float)
+print(max_score,'-',min_score)
+score_low,score_high=st.sidebar.slider(
+    'Seleccione rango de calificaciones',
+    min_score,max_score,(min_score,max_score)
+
+)
+data_fil=data_fil[
+    (data_fil['performance_score']>=score_low)&
+    (data_fil['performance_score']<=score_high)
+]
+
+#estado civil del empleado
+add_select_civil=st.sidebar.selectbox(
+    'Seleccione estado civil del empleado: ',
+    options=['Todos']+list(data['marital_status'].unique())
+)
+if add_select_civil !='Todos':
+    data_fil=data_fil[data_fil['marital_status']==add_select_civil]
+
+
+
+#distribucion de puntajes de desempeño
+grafica1 = px.histogram(data_fil,x='performance_score',
+                    color='marital_status',
+                    hover_data=['name_employee'],
+                    title='puntajes de desempeño'
+                      )
+grafica1.show()
+st.plotly_chart(grafica1,width='stretch')
+
+#promedio de horas trabajadas por genero del empleado
+
+grafica2=px.box(data_fil,x='gender',
+                y='average_work_hours',
+                color='gender',
+                notched=True,
+                points='all',
+                title='promedio de horas trabajadas por genero'
+                )
+
+grafica2.show()
+st.plotly_chart(grafica2,width='stretch')
+col1,col2=st.columns(2)
+if add_select_gender !='Todos':
+
+    genero=str(data_fil['gender'].unique())
+    if genero=='M':
+        genero='Mujeres'
+    else:
+        genero = 'Hombres'
+    col1.metric('promedio de ',genero,
+    round(data_fil['average_work_hours'].mean(),2),
+                border=True
+                )
+else:
+    data_fil1 = data_fil[data_fil['gender'] == 'M']
+    data_fil2 = data_fil[data_fil['gender'] == 'F']
+    col1.metric('promedio de hombres',
+                round(data_fil1['average_work_hours'].mean(),2),
+                border=True
+                )
+    col2.metric('promedio de mujeres',
+                round(data_fil2['average_work_hours'].mean(),2),
+                border=True
+                )
+#edad de los empleados respecto al salario
+grafica3=alt.Chart(data_fil).mark_point(filled=True).encode(
+ x=alt.X('age',title='edad'),
+ y=alt.Y('salary',title='sueldo'),
+ color='gender'
+)
+puntos=grafica3.mark_circle(size=50,color='blue').encode(
+    tooltip=['age','salary']
+)
+
+linea=grafica3.transform_regression(
+    'age','salary',method='linear'
+).mark_line(
+    color='red',
+    strokeWidth=3
+)
+
+grafica3_4=(puntos+linea).interactive().properties(
+    title='Relacion de edad contra sueldo')
+
+st.altair_chart(grafica3_4,width='stretch')
+
+#relacion del promedio de horas trabajadas vs puntaje de desempeño
+grafica5=px.box(data_fil,
+    x='performance_score',
+    title='Horas trabajadas vs score',
+    y='average_work_hours',
+    notched=True,
+    points='all'
+)
+
+st.plotly_chart(grafica5,width='stretch')
+#conclusion del analisis mostrado
+st.header('Conclusiones')
+st.write('Generos: ambos generos tienden a la calificacion, el genero no infiere en la calificacion')
+st.write('edad: la relacion si tiene una relacion positiva con el sueldo')
+st.write('estado civil: ')
+st.write('Para los hombres se aprecia que en los casos de single o divorce, tienen relacion positiva con aumento de sueldo, los demas es lo contrario')
+st.write('Para las mujeres se aprecia que el unico caso en el que se aprecia un aumento de sueldo con la edad es cuando estan casadas, cualquier otro es neutral o disminuye')
